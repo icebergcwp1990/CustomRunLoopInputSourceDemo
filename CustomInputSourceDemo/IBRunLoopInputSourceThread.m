@@ -53,27 +53,27 @@ void runLoopObserverCallBack (CFRunLoopObserverRef observer, CFRunLoopActivity a
 {
     @autoreleasepool {
       
+        //创建InputSource
         self.inputSource = [[IBRunLoopInputSource alloc] init];
         [self.inputSource setDelegate:self];
+        //添加InputSource到当前线程RunLoop
         [self.inputSource addToCurrentRunLoop];
-        
+        //配置RunLoop监听器
         [self configureRunLoopObserver];
         
         while (!self.cancelled) {
             
-//            NSLog(@"Enter Run Loop...");
-            
-            [self finishOtherTask];
-            
+            //作为对照，执行线程其他非InputSource任务
+            [self doOtherTask];
+            //切入RunLoop
             [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate distantFuture]];
-            
-//            NSLog(@"Exit Run Loop...");
             
         }
         
     }
 }
 
+//配置RunLoop监听器
 - (void)configureRunLoopObserver
 {
     NSRunLoop * currentRunLoop = [NSRunLoop currentRunLoop];
@@ -93,16 +93,18 @@ void runLoopObserverCallBack (CFRunLoopObserverRef observer, CFRunLoopActivity a
     }
 }
 
-- (void)finishOtherTask
+- (void)doOtherTask
 {
-    NSLog(@"OtherTask: 🐴🐴🐴🐴🐴🐴🐴🐴🐴🐴");
+    NSLog(@"Do other task: 🐴🐴🐴🐴🐴🐴🐴🐴🐴🐴");
 
 }
 
 #pragma mark - IBRunLoopInputSourceTestDelegate
 
+//处理InputSource数据函数
 - (void)inputSourceForTest:(id)data
 {
+    //此处仅输出数据，做测试而已
     NSLog(@"%s %@" , __func__ , data);
     
 }

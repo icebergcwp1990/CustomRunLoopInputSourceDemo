@@ -14,8 +14,11 @@
 - (id)initWithSource:(IBRunLoopInputSource *)runLoopSource andLoop:(CFRunLoopRef )runLoop
 {
     self = [super init];
-    if (self) {
+    if (self)
+    {
+        //强引用InputSource和InputSource所在的RunLoop
         _runLoopInputSource = runLoopSource;
+        
         _runLoop = runLoop;
     }
     return self;

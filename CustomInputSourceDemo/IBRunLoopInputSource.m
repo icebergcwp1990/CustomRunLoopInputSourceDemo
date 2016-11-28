@@ -10,30 +10,41 @@
 #import "IBRunLoopContext.h"
 #import "AppDelegate.h"
 
+#pragma mark - Custom InputSource RunLoop CallBack
+
+//inputsource部署回调
 void RunLoopSourceScheduleRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
 {
-    IBRunLoopInputSource* obj = (__bridge IBRunLoopInputSource*)info;
-
-    IBRunLoopContext * theContext = [[IBRunLoopContext alloc] initWithSource:obj andLoop:rl];
-    
+    IBRunLoopInputSource* inputSource = (__bridge IBRunLoopInputSource*)info;
+    //创建一个context，包含当前输入源和RunLoop
+    IBRunLoopContext * theContext = [[IBRunLoopContext alloc] initWithSource:inputSource andLoop:rl];
+    //将context传入主线程建立强引用，用于后续操作
     [(AppDelegate *)[NSApp delegate] performSelectorOnMainThread:@selector(registerSource:)
                           withObject:theContext waitUntilDone:NO];
+    //InputSource弱引用context，因为context已经强引用InputSource，避免循环引用，用于后续移除操作
+    inputSource.context = theContext;
 }
 
+//inputsource执行任务回调
 void RunLoopSourcePerformRoutine (void *info)
 {
-    IBRunLoopInputSource*  obj = (__bridge IBRunLoopInputSource*)info;
-    [obj sourceCommandsFired];
+    IBRunLoopInputSource*  inputSource = (__bridge IBRunLoopInputSource*)info;
+    //执行InputSource相关的处理
+    [inputSource performSourceCommands];
 }
 
+//inputsource移除回调
 void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
 {
-    IBRunLoopInputSource* obj = (__bridge IBRunLoopInputSource*)info;
-   
-    IBRunLoopContext* theContext = [[IBRunLoopContext alloc] initWithSource:obj andLoop:rl];
+    IBRunLoopInputSource* inputSource = (__bridge IBRunLoopInputSource*)info;
+    //移除主线程中InputSource对应的Context引用
+    if (inputSource.context)
+    {
+        [(AppDelegate *)[NSApp delegate] performSelectorOnMainThread:@selector(removeSource:)
+                                                          withObject:inputSource.context waitUntilDone:YES];
+    }
     
-    [(AppDelegate *)[NSApp delegate] performSelectorOnMainThread:@selector(removeSource:)
-                          withObject:theContext waitUntilDone:YES];
+    
 }
 
 @interface IBRunLoopInputSource ()
@@ -57,12 +68,13 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
     
     if (self) {
         
-        //共有8个回调函数，目前只实现三个
+        //InputSource上下文，共有8个回调函数，目前只实现三个
         CFRunLoopSourceContext context = {0, (__bridge void *)(self), NULL, NULL, NULL, NULL, NULL,
             &RunLoopSourceScheduleRoutine,
             &RunLoopSourceCancelRoutine,
             &RunLoopSourcePerformRoutine};
         
+        //初始化自定义InputSource
         _runLoopSource = CFRunLoopSourceCreate(NULL, 0, &context);
         
     }
@@ -70,13 +82,15 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
     return self;
 }
 
+//添加自定义InputSource到当前RunLoop
 - (void)addToCurrentRunLoop
 {
     CFRunLoopRef runLoop = CFRunLoopGetCurrent();
-    
+    //添加到当前RunLoop的kCFRunLoopDefaultMode下
     CFRunLoopAddSource(runLoop, _runLoopSource, kCFRunLoopDefaultMode);
 }
 
+//从当前RunLoop移除自定义InputSource
 - (void)invalidateFromCurrentRunLoop
 {
     CFRunLoopRef runLoop = CFRunLoopGetCurrent();
@@ -84,6 +98,7 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
     CFRunLoopRemoveSource(runLoop, _runLoopSource, kCFRunLoopDefaultMode);
 }
 
+//从指定RunLoop移除自定义InputSource
 - (void)invalidateFromRunLoop:(CFRunLoopRef )runLoop
 {
     CFRunLoopRemoveSource(runLoop, _runLoopSource, kCFRunLoopDefaultMode);
@@ -102,16 +117,17 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
 
 #pragma mark - Handler
 
-- (void)sourceCommandsFired
+//执行InputSource指令
+- (void)performSourceCommands
 {
-    NSLog(@"%s" , __func__);
-    
+    //根据指令获得对应的数据
     id data = [self.commandInfo objectForKey:@(_currCommand)];
     
     if (!data) {
         data = [NSString stringWithFormat:@"Empty data for command : %ld" , _currCommand ];
     }
     
+    //通过代理进行处理
     if (self.delegate && [self.delegate respondsToSelector:@selector(inputSourceForTest:)]) {
         [self.delegate inputSourceForTest:data];
     }
@@ -120,6 +136,7 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
 
 #pragma mark - Command
 
+//添加指令到InputSource
 - (void)addCommand:(NSInteger)command withData:(id)data
 {
     if (data)
@@ -129,11 +146,14 @@ void RunLoopSourceCancelRoutine (void *info, CFRunLoopRef rl, CFStringRef mode)
     
 }
 
+//触发InputSource指令
 - (void)fireCommand:(NSInteger)command onRunLoop:(CFRunLoopRef)runloop
 {
     _currCommand = command;
     
+    //通知InputSource准备触发指令
     CFRunLoopSourceSignal(_runLoopSource);
+    //唤醒InputSource所在的RunLoop
     CFRunLoopWakeUp(runloop);
 }
 

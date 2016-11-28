@@ -85,37 +85,39 @@
 {
     NSAssert([self.sourcesToPing count] !=  0, @"Empty Input Source...");
     
-    //此处默认取第一个用于测试，可优化
-    IBRunLoopContext *runLoopContext = [self.sourcesToPing objectAtIndex:0];
-    IBRunLoopInputSource *inputSource = runLoopContext.runLoopInputSource;
-    //向数据源添加指令
-    [inputSource addCommand:command withData:data];
-    //添加后并非要立刻触发，此处仅用于测试
-    [inputSource fireCommand:command onRunLoop:runLoopContext.runLoop];
+    if (self.sourcesToPing.count > 0) {
+        
+        //此处默认取第一个用于测试，可优化
+        IBRunLoopContext *runLoopContext = [self.sourcesToPing objectAtIndex:0];
+        IBRunLoopInputSource *inputSource = runLoopContext.runLoopInputSource;
+        //向数据源添加指令
+        [inputSource addCommand:command withData:data];
+        //添加后并非要立刻触发，此处仅用于测试
+        [inputSource fireCommand:command onRunLoop:runLoopContext.runLoop];
+    }
+    
 }
 
 #pragma mark - Custom Input Source
 
+//注册子线程中InputSource对应的context,用于后续通信
 - (void)registerSource:(IBRunLoopContext*)sourceInfo
 {
     [self.sourcesToPing addObject:sourceInfo];
 }
-
+//移除子线程中InputSource对应的context
 - (void)removeSource:(IBRunLoopContext*)sourceInfo
 {
-    id  objToRemove = nil;
-    
-    for (IBRunLoopContext* context in self.sourcesToPing)
-    {
-        if ([context isEqual:sourceInfo])
+    [self.sourcesToPing enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+        
+        if ([obj isEqual:sourceInfo])
         {
-            objToRemove = context;
-            break;
+           [self.sourcesToPing removeObject:obj];
+            *stop = YES;
         }
-    }
-    
-    if (objToRemove)
-        [self.sourcesToPing removeObject:objToRemove];
+        
+    }];
+  
 }
 
 @end

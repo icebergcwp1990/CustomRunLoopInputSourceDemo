@@ -7,6 +7,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "IBRunLoopContext.h"
 
 @protocol IBRunLoopInputSourceTestDelegate <NSObject>
 
@@ -14,19 +15,21 @@
 
 @end
 
+//自定义Input Source
 @interface IBRunLoopInputSource : NSObject
 
 @property (nonatomic, assign) id<IBRunLoopInputSourceTestDelegate> delegate;
+@property (nonatomic, weak) IBRunLoopContext * context;
+
 
 - (id)init;
 - (void)addToCurrentRunLoop;
 - (void)invalidateFromCurrentRunLoop;
 - (void)invalidateFromRunLoop:(CFRunLoopRef )runLoop;
 
-- (void)sourceCommandsFired;
+- (void)performSourceCommands;
 
 - (void)addCommand:(NSInteger)command withData:(id)data;
-
 - (void)fireCommand:(NSInteger)command onRunLoop:(CFRunLoopRef)runloop;
 
 @end
